@@ -17,7 +17,17 @@ export default class Video extends BaseModel {
   declare originalFilename: string
 
   @column()
-  declare storagePath: string
+  declare storagePath: string | null
+
+  // Cloudinary fields
+  @column()
+  declare cloudinaryUrl: string | null
+
+  @column()
+  declare cloudinaryStreamingUrl: string | null
+
+  @column()
+  declare cloudinaryPublicId: string | null
 
   @column()
   declare audioPath: string | null
@@ -29,18 +39,16 @@ export default class Video extends BaseModel {
   declare thumbnailPath: string | null
 
   @column()
-  declare subtitlePath: string | null  // .srt file path
+  declare subtitlePath: string | null
 
   @column()
-  declare extension: string | null  // .mp4, .avi, .mov
+  declare extension: string | null
 
   @column.dateTime()
-  declare uploadTime: DateTime | null  // when upload started
+  declare uploadTime: DateTime | null
 
-  // ── NEW: Upload duration tracking ─────────────────────────
   @column()
-  declare uploadDuration: number | null  // upload time in milliseconds
-  // ──────────────────────────────────────────────────────────
+  declare uploadDuration: number | null
 
   @column.dateTime()
   declare processingStartedAt: DateTime | null

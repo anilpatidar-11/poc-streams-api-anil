@@ -34,12 +34,10 @@ router.group(() => {
     router.get('/:id/stream', [VideosController, 'stream'])
     router.get('/:id/status', [VideosController, 'status'])
     
-    // Audio
     router.get('/:id/audio', [AudioController, 'download'])
     router.get('/:id/audio/clean', [AudioController, 'downloadClean'])
     router.post('/:id/audio/process', [AudioController, 'processAudio'])
     
-    // ── NEW: Subtitles ──────────────────────────────────────────
     router.get('/:id/subtitles', [VideosController, 'downloadSubtitles'])
     
   }).prefix('/videos')

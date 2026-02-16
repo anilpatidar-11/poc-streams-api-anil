@@ -6,15 +6,31 @@ import drive from '@adonisjs/drive/services/main'
 import Video from '#models/video'
 import { videoProcessingQueue } from '#services/queue_service'
 import fs from 'node:fs'
+import { uploadVideoToCloudinary } from '#services/cloudinary_service'
 
 export default class VideosController {
-
+x
   async index({ auth, response }: HttpContext) {
     // const user = await auth.authenticate()
     const videos = await Video.query()
       .where('user_id', 1)
       .orderBy('created_at', 'desc')
-    return response.ok({ count: videos.length, videos })
+    
+    const formattedVideos = videos.map(video => ({
+      id: video.id,
+      title: video.title,
+      status: video.status,
+      cloudinaryUrl: video.cloudinaryUrl,
+      cloudinaryStreamingUrl: video.cloudinaryStreamingUrl,
+      cloudinaryPublicId: video.cloudinaryPublicId,
+      duration: video.duration,
+      resolution: video.resolution,
+      fileSize: video.fileSize,
+      extension: video.extension,
+      createdAt: video.createdAt,
+    }))
+    
+    return response.ok({ count: formattedVideos.length, videos: formattedVideos })
   }
 
   async show({ params, auth, response }: HttpContext) {
@@ -23,69 +39,115 @@ export default class VideosController {
       .where('id', params.id)
       .where('user_id', 1)
       .firstOrFail()
-    return response.ok({ video })
+    
+    return response.ok({ 
+      video: {
+        id: video.id,
+        title: video.title,
+        status: video.status,
+        cloudinaryUrl: video.cloudinaryUrl,
+        cloudinaryStreamingUrl: video.cloudinaryStreamingUrl,
+        cloudinaryPublicId: video.cloudinaryPublicId,
+        duration: video.duration,
+        resolution: video.resolution,
+        fileSize: video.fileSize,
+        extension: video.extension,
+        createdAt: video.createdAt,
+      }
+    })
   }
 
-  async upload({ request, auth, response }: HttpContext) {
-    // const user = await auth.authenticate()
+async upload({ request, auth, response }: HttpContext) {
+  // const user = await auth.authenticate()
+  const userId = 1
+  const uploadStartTime = Date.now()
 
-    const uploadStartTime = Date.now()
-    // ───────────────────────────────────────────────────────────
+  const videoFile = request.file('video', {
+    extnames: ['mp4', 'avi', 'mov', 'mkv', 'webm'],
+    size: '2gb',
+  })
 
-    const videoFile = request.file('video', {
-      extnames: ['mp4', 'avi', 'mov', 'mkv', 'webm'],
-      size: '2gb',
+  if (!videoFile || !videoFile.isValid) {
+    return response.badRequest({
+      error: 'No video file provided or invalid',
+      details: videoFile?.errors,
     })
+  }
 
-    if (!videoFile || !videoFile.isValid) {
-      return response.badRequest({
-        error: 'No video file provided or invalid',
-        details: videoFile?.errors,
-      })
-    }
+  const ext = videoFile.extname || 'mp4'
+  const storagePath = `videos/${userId}/${Date.now()}.${ext}`
+  await videoFile.moveToDisk(storagePath)
 
-    const ext = videoFile.extname || 'mp4'
-    const storagePath = `videos/1/${Date.now()}.${ext}`
+  const uploadDuration = Date.now() - uploadStartTime
+
+  // Create video record in DB
+  const video = await Video.create({
+    userId,
+    title: request.input('title', videoFile.clientName),
+    originalFilename: videoFile.clientName || 'unknown',
+    storagePath,
+    fileSize: videoFile.size || 0,
+    mimeType: `video/${ext}`,
+    status: 'uploading',
+    extension: ext,
+    uploadTime: DateTime.now(),
+    uploadDuration,
+  })
+
+  try {
+    // Upload to Cloudinary and WAIT for it to complete
+    const filePath = app.makePath('storage', storagePath)
+    const fileName = videoFile.clientName || `video_${Date.now()}`
     
-    await videoFile.moveToDisk(storagePath)
+    const cloudinaryResult = await uploadVideoToCloudinary(filePath, fileName)
 
-    const uploadEndTime = Date.now()
-    const uploadDuration = uploadEndTime - uploadStartTime
+    // Update with Cloudinary URLs
+    video.cloudinaryUrl = cloudinaryResult.url
+    video.cloudinaryStreamingUrl = cloudinaryResult.streamingUrl
+    video.cloudinaryPublicId = cloudinaryResult.publicId
+    video.status = 'uploaded'
+    await video.save()
 
-    const video = await Video.create({
-      userId: 1,
-      title: request.input('title', videoFile.clientName),
-      originalFilename: videoFile.clientName || 'unknown',
-      storagePath,
-      fileSize: videoFile.size || 0,
-      mimeType: `video/${ext}`,
-      status: 'uploaded',
-      extension: ext,
-      uploadTime: DateTime.now(),
-      uploadDuration, 
-    })
+    // Queue for audio/subtitle processing in background
+    videoProcessingQueue?.add('process-video', {
+      videoId: video.id,
+      storagePath: filePath,
+    }).catch(err => console.error('Queue error:', err))
 
-    try {
-      await videoProcessingQueue?.add('process-video', {
-        videoId: video.id,
-        storagePath: app.makePath('storage', storagePath),
-      })
-      await video.merge({ status: 'processing' }).save()
-    } catch {}
-
+    // Return with streaming URL
     return response.created({
-      message: 'Video uploaded',
+      message: 'Video uploaded successfully to Cloudinary',
       video: {
         id: video.id,
         title: video.title,
         extension: ext,
         uploadTime: video.uploadTime,
-        uploadDuration: uploadDuration, 
-        uploadDurationSeconds: (uploadDuration / 1000).toFixed(2), 
-        status: video.status
+        uploadDuration,
+        uploadDurationSeconds: (uploadDuration / 1000).toFixed(2),
+        status: video.status,
+        cloudinaryUrl: video.cloudinaryUrl,
+        cloudinaryStreamingUrl: video.cloudinaryStreamingUrl,
+        cloudinaryPublicId: video.cloudinaryPublicId,
+      }
+    })
+
+  } catch (err) {
+    console.error('Cloudinary upload failed:', err)
+    video.status = 'failed'
+    video.errorMessage = 'Cloudinary upload failed'
+    await video.save()
+
+    return response.status(500).json({
+      error: 'Cloudinary upload failed',
+      message: err.message,
+      video: {
+        id: video.id,
+        status: 'failed'
       }
     })
   }
+}
+
 
   async uploadMultiple({ request, auth, response }: HttpContext) {
     const user = await auth.authenticate()
@@ -197,6 +259,9 @@ export default class VideosController {
       processingDuration: video.processingStartedAt && video.processingCompletedAt
         ? video.processingCompletedAt.diff(video.processingStartedAt, 'milliseconds').milliseconds
         : null,
+      cloudinaryUrl: video.cloudinaryUrl,
+      cloudinaryStreamingUrl: video.cloudinaryStreamingUrl,
+      cloudinaryPublicId: video.cloudinaryPublicId,
       audioReady: !!video.audioPath,
       cleanAudioReady: !!video.cleanAudioPath,
       thumbnailReady: !!video.thumbnailPath,
