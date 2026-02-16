@@ -42,6 +42,7 @@ const RESOLUTION_MAP: Record<VideoResolution, string> = {
   '360p':  'scale=-2:360',   //  640×360  — mobile / low bandwidth
   '480p':  'scale=-2:480',   //  854×480  — SD
   '720p':  'scale=-2:720',   // 1280×720  — HD
+  
   '1080p': 'scale=-2:1080',  // 1920×1080 — Full HD
   '1440p': 'scale=-2:1440',  // 2560×1440 — QHD / HD+
   '4k':    'scale=-2:2160',  // 3840×2160 — 4K UHD
