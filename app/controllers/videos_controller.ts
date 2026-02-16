@@ -4,6 +4,7 @@ import { DateTime } from 'luxon'
 import app from '@adonisjs/core/services/app'
 import drive from '@adonisjs/drive/services/main'
 import Video from '#models/video'
+import {VideoService}from '#services/video_service'
 import { videoProcessingQueue } from '#services/queue_service'
 import fs from 'node:fs'
 
@@ -253,5 +254,35 @@ export default class VideosController {
 
     await video.delete()
     return response.ok({ message: 'Video deleted successfully' })
+  }
+   async convert({ request, response }: HttpContext) {
+    const { fileName, quality } = request.only(['fileName', 'quality'])
+
+    if (!fileName) {
+      return response.badRequest({
+        error: 'fileName is required',
+      })
+    }
+
+    const allowedQualities = ['high', 'mid', 'low']
+    const selectedQuality = allowedQualities.includes(quality) ? quality : 'high'
+
+    try {
+      const videoService = new VideoService()
+
+      const result = await videoService.convertVideo({
+        fileName,
+        quality: selectedQuality,
+      })
+
+      return response.ok({
+        message: 'Video converted successfully',
+        data: result,
+      })
+    } catch (error) {
+      return response.internalServerError({
+        error: error.message,
+      })
+    }
   }
 }

@@ -41,7 +41,9 @@ router.group(() => {
     
     // ── NEW: Subtitles ──────────────────────────────────────────
     router.get('/:id/subtitles', [VideosController, 'downloadSubtitles'])
-    
+
+    // video converter
+    router.post('/convert', [VideosController, 'convert'])   
   }).prefix('/videos')
 
 }).prefix('/api')
