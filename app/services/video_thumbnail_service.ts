@@ -5,6 +5,7 @@ import ffmpegStatic from 'ffmpeg-static'
 import sharp from 'sharp'
 import { v4 as uuid } from 'uuid'
 import app from '@adonisjs/core/services/app'
+import cloudinary from './cloudinary_service.js'
 
 if (ffmpegStatic) {
     ffmpeg.setFfmpegPath(ffmpegStatic)
@@ -42,7 +43,6 @@ export interface UploadVideoResult {
     thumbnails: ThumbnailMeta[]
 }
 
-// ── Service ───────────────────────────────────────────────────
 
 export default class VideoThumbnailService {
 
@@ -51,65 +51,92 @@ export default class VideoThumbnailService {
         videoFile: any,
         customThumbnailFile?: any
     ): Promise<UploadVideoResult> {
+
         console.log('🎬 Starting video upload...')
 
-        // 1. Save video
-        const uploadDir = app.publicPath('uploads/videos')
-        await fs.mkdir(uploadDir, { recursive: true })
+        // Temporary folder
+        const tempDir = app.tmpPath(`uploads/${uuid()}`)
+        await fs.mkdir(tempDir, { recursive: true })
 
         const fileName = `${Date.now()}-${uuid()}.mp4`
-        await videoFile.move(uploadDir, { name: fileName })
+        await videoFile.move(tempDir, { name: fileName })
 
-        const videoPath = path.join(uploadDir, fileName)
-        const videoUrl = `/uploads/videos/${fileName}`
-        console.log(`✅ Video saved: ${videoPath}`)
+        const videoPath = path.join(tempDir, fileName)
 
-        // 2. Get duration
+        // ───────── Upload VIDEO to Cloudinary ─────────
+        console.log('☁ Uploading video to Cloudinary...')
+
+        const uploadedVideo = await cloudinary.uploader.upload(videoPath, {
+            resource_type: 'video',
+            folder: 'streaming/videos',
+        })
+
+        const videoUrl = uploadedVideo.secure_url
+        console.log('✅ Video uploaded to Cloudinary')
+
+
         const duration = await this.getVideoDuration(videoPath)
-        console.log(`📹 Duration: ${duration}s (${this.formatTime(duration)})`)
         if (duration <= 0) throw new Error('Invalid video duration')
 
-        // 3. Calculate frames and interval
         const { frameCount, interval } = this.calculateFrameCount(duration)
-        console.log(`🎯 Frame Count: ${frameCount} (every ${interval.toFixed(2)}s)`)
 
-        // 4. Create thumbnail folder
-        const videoFolderId = uuid()
-        const thumbnailDir = app.publicPath(`thumbnails/${videoFolderId}`)
-        await fs.mkdir(thumbnailDir, { recursive: true })
-
-        // 5. Generate sprite (single ffmpeg tile command — fast!)
-        console.log('🚀 Generating sprite with ffmpeg...')
-        const spriteInfo = await this.generateSprite(
+        // ───────── Generate Sprite Locally ─────────
+        const spriteInfoLocal = await this.generateSprite(
             videoPath,
-            thumbnailDir,
-            videoFolderId,
+            tempDir,
+            'temp',
             frameCount,
             interval
         )
-        console.log(`✅ Sprite generated: ${spriteInfo.columns}x${spriteInfo.rows}`)
 
-        // 6. Handle optional custom poster
-        let posterUrl = ''
-        if (customThumbnailFile) {
-            const posterName = `poster.webp`
-            await customThumbnailFile.move(thumbnailDir, { name: posterName })
-            posterUrl = `/thumbnails/${videoFolderId}/${posterName}`
-            console.log('✅ Custom poster saved')
-        }
+        const localSpritePath = path.join(tempDir, 'sprite.webp')
 
-        // 7. Build thumbnail metadata (time info only, no image paths needed — sprite handles display)
-        const thumbnails: ThumbnailMeta[] = Array.from({ length: frameCount }, (_, i) => {
-            const timeSecond = Number((i * interval).toFixed(2))
-            return {
-                frameNo: i + 1,
-                timeSecond,
-                timeLabel: this.formatTime(timeSecond),
-            }
+        // ───────── Upload Sprite to Cloudinary ─────────
+        console.log('☁ Uploading sprite to Cloudinary...')
+
+        const uploadedSprite = await cloudinary.uploader.upload(localSpritePath, {
+            resource_type: 'image',
+            folder: 'streaming/sprites',
         })
 
+        console.log('✅ Sprite uploaded')
+
+        // ───────── Upload Poster if exists ─────────
+        let posterUrl = ''
+
+        if (customThumbnailFile) {
+            const posterName = `poster.webp`
+            await customThumbnailFile.move(tempDir, { name: posterName })
+
+            const uploadedPoster = await cloudinary.uploader.upload(
+                path.join(tempDir, posterName),
+                {
+                    resource_type: 'image',
+                    folder: 'streaming/posters',
+                }
+            )
+
+            posterUrl = uploadedPoster.secure_url
+        }
+
+        // ───────── Cleanup Local Files ─────────
+        await fs.rm(tempDir, { recursive: true, force: true })
+
+        // ───────── Build Metadata ─────────
+        const thumbnails: ThumbnailMeta[] = Array.from(
+            { length: frameCount },
+            (_, i) => {
+                const timeSecond = Number((i * interval).toFixed(2))
+                return {
+                    frameNo: i + 1,
+                    timeSecond,
+                    timeLabel: this.formatTime(timeSecond),
+                }
+            }
+        )
+
         return {
-            videoId: videoFolderId,
+            videoId: uploadedVideo.public_id,
             fileName: videoFile.clientName,
             videoUrl,
             posterUrl,
@@ -117,8 +144,17 @@ export default class VideoThumbnailService {
             durationFormatted: this.formatTime(duration),
             thumbnailCount: frameCount,
             interval,
-            intervalLabel: interval === 1 ? '1 per second' : `every ${interval.toFixed(2)}s`,
-            sprite: spriteInfo,
+            intervalLabel:
+                interval === 1 ? '1 per second' : `every ${interval.toFixed(2)}s`,
+            sprite: {
+                path: uploadedSprite.secure_url,
+                columns: spriteInfoLocal.columns,
+                rows: spriteInfoLocal.rows,
+                thumbWidth: spriteInfoLocal.thumbWidth,
+                thumbHeight: spriteInfoLocal.thumbHeight,
+                spriteWidth: spriteInfoLocal.spriteWidth,
+                spriteHeight: spriteInfoLocal.spriteHeight,
+            },
             thumbnails,
         }
     }
