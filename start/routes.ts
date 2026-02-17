@@ -60,3 +60,31 @@ router.group(() => {
   router.get('/videos/:id/thumbnails', [VideoThumbnailController, 'getThumbnails'])
 
 }).prefix('/api/v1') 
+
+// routes/live_streams.ts
+const LiveStreamsController = () => import('#controllers/live_streams_controller')
+  router
+    .group(() => {
+      // Start a new live stream
+      router.post('/start', [LiveStreamsController, 'start'])
+
+      // Receive video chunks during streaming
+      router.post('/:sessionId/chunk', [LiveStreamsController, 'receiveChunk'])
+
+      // End live stream and save to database
+      router.post('/:sessionId/end', [LiveStreamsController, 'end'])
+
+      // Cancel live stream
+      router.post('/:sessionId/cancel', [LiveStreamsController, 'cancel'])
+
+      // Get user's videos
+      router.get('/my-videos', [LiveStreamsController, 'getMyVideos'])
+
+      // Get single video
+      router.get('/videos/:videoId', [LiveStreamsController, 'getVideo'])
+
+      // Delete video
+      router.delete('/videos/:videoId', [LiveStreamsController, 'deleteVideo'])
+    })
+    .prefix('/api/live-streams')
+
