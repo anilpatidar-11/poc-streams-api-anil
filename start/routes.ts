@@ -45,9 +45,11 @@ router.group(() => {
 
     // Convert an already-uploaded video (decompress → ffmpeg → compress)
     router.post('/convert', [VideosController, 'convert'])
-
+    
+    router.post('/upload-video-convert',[VideosController,'uploadVideoConvert'])
+    
     // Download a video (decompress on-the-fly, stream to client)
-    router.get('/download/:fileName', [VideosController, 'download'])
+    router.get('/:id/download', [VideosController, 'download'])
     
   }).prefix('/videos')
 
