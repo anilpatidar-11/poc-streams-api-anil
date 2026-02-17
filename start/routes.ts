@@ -43,6 +43,12 @@ router.group(() => {
     // ── NEW: Subtitles ──────────────────────────────────────────
     router.get('/:id/subtitles', [VideosController, 'downloadSubtitles'])
 
+    // Convert an already-uploaded video (decompress → ffmpeg → compress)
+    router.post('/convert', [VideosController, 'convert'])
+
+    // Download a video (decompress on-the-fly, stream to client)
+    router.get('/download/:fileName', [VideosController, 'download'])
+    
   }).prefix('/videos')
 
 }).prefix('/api')
