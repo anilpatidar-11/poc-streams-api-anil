@@ -7,7 +7,7 @@ import Video from '#models/video'
 import { videoProcessingQueue } from '#services/queue_service'
 import fs from 'node:fs'
 import { uploadVideoToCloudinary } from '#services/cloudinary_service'
-import type { VideoQuality, VideoResolution, EnhanceType } from '#services/video_service'
+import type { VideoQuality, VideoResolution,AdvancedFilters } from '#services/video_service'
 import VideoService from '#services/video_service'
 import { cuid } from '@adonisjs/core/helpers'
 import { unlink } from 'node:fs/promises'
@@ -15,10 +15,9 @@ import path from 'node:path'
 import ResponseHelper from '../utils/response_helper.js'
 // ─── Validation constants ─────────────────────────────────────────────────────
 
-const SUPPORTED_FORMATS: string[] = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv', 'mpeg']
-const SUPPORTED_QUALITIES: VideoQuality[] = ['lossless', 'high', 'medium', 'low']
+const SUPPORTED_FORMATS: string[]              = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv', 'mpeg']
+const SUPPORTED_QUALITIES: VideoQuality[]      = ['lossless', 'high', 'medium', 'low']
 const SUPPORTED_RESOLUTIONS: VideoResolution[] = ['360p', '480p', '720p', '1080p', '1440p', '4k']
-const SUPPORTED_ENHANCES: EnhanceType[] = ['denoise', 'sharpen', 'stabilize', 'hdr', 'none']
 
 export default class VideosController {
   async index({ auth, response, i18n }: HttpContext) {
@@ -329,15 +328,12 @@ export default class VideosController {
       outputFormat,
       quality = 'medium',
       resolution,
-      enhance = 'none',
-    } = request.only(['fileName', 'outputFormat', 'quality', 'resolution', 'enhance'])
-
-    // Validate required
+      filters,
+    } = request.only(['fileName', 'outputFormat', 'quality', 'resolution', 'filters'])
     if (!fileName || !outputFormat) {
       return ResponseHelper.badRequest(response, i18n.t('video.file_and_format_required'))
     }
 
-    // Validate format
     if (!SUPPORTED_FORMATS.includes(outputFormat.toLowerCase())) {
       return ResponseHelper.badRequest(
         response,
@@ -345,7 +341,6 @@ export default class VideosController {
       )
     }
 
-    // Validate quality
     if (!SUPPORTED_QUALITIES.includes(quality)) {
       return ResponseHelper.badRequest(
         response,
@@ -353,20 +348,17 @@ export default class VideosController {
       )
     }
 
-    // Validate resolution (optional)
     if (resolution && !SUPPORTED_RESOLUTIONS.includes(resolution)) {
-      return ResponseHelper.badRequest(
-        response,
-        i18n.t('video.invalid_resolution', { resolutions: SUPPORTED_RESOLUTIONS.join(', ') })
-      )
+      return response.badRequest({
+        error: `Invalid resolution. Choose from: ${SUPPORTED_RESOLUTIONS.join(', ')} or omit`,
+      })
     }
 
-    // Validate enhance (optional)
-    if (enhance && !SUPPORTED_ENHANCES.includes(enhance)) {
-      return ResponseHelper.badRequest(
-        response,
-        i18n.t('video.invalid_enhance', { enhances: SUPPORTED_ENHANCES.join(', ') })
-      )
+    if (filters) {
+      const validationErrors = this.validateFilters(filters)
+      if (validationErrors.length > 0) {
+        return response.badRequest({ error: 'Invalid filters', details: validationErrors })
+      }
     }
 
     const service = new VideoService()
@@ -375,11 +367,103 @@ export default class VideosController {
       fileName,
       outputFormat: outputFormat.toLowerCase(),
       quality,
-      resolution, // undefined = keep original resolution
-      enhance,
+      resolution,
+      filters: filters as AdvancedFilters | undefined,
     })
 
     return ResponseHelper.success(response, i18n.t('video.convert_success'), result)
+  }
+
+  async uploadAndConvert({ request, response }: HttpContext) {
+    const videoFile = request.file('video', {
+      size: '2gb',
+      extnames: SUPPORTED_FORMATS,
+    })
+
+    if (!videoFile || !videoFile.isValid) {
+      return response.badRequest({
+        error: videoFile ? videoFile.errors : 'No video file provided',
+      })
+    }
+
+    const {
+      outputFormat,
+      quality    = 'medium',
+      resolution,
+      filters,
+    } = request.only(['outputFormat', 'quality', 'resolution', 'filters'])
+
+    if (!outputFormat) {
+      return response.badRequest({ error: 'outputFormat is required' })
+    }
+
+    const fileName  = `${cuid()}.${videoFile.extname}`
+    const uploadDir = app.makePath('storage/videos/uploads')
+    const rawPath   = path.join(uploadDir, fileName)
+
+    await videoFile.move(uploadDir, { name: fileName })
+
+    const service = new VideoService()
+    await service.compressFile(rawPath)
+
+    const result = await service.convertVideo({
+      fileName,
+      outputFormat: outputFormat.toLowerCase(),
+      quality,
+      resolution,
+      filters: filters as AdvancedFilters | undefined,
+    })
+
+    return response.ok({
+      message: 'Video uploaded, converted, and stored compressed',
+      data: result,
+    })
+  }
+
+  async uploadAndConvert({ request, response }: HttpContext) {
+    const videoFile = request.file('video', {
+      size: '2gb',
+      extnames: SUPPORTED_FORMATS,
+    })
+
+    if (!videoFile || !videoFile.isValid) {
+      return response.badRequest({
+        error: videoFile ? videoFile.errors : 'No video file provided',
+      })
+    }
+
+    const {
+      outputFormat,
+      quality    = 'medium',
+      resolution,
+      filters,
+    } = request.only(['outputFormat', 'quality', 'resolution', 'filters'])
+
+    if (!outputFormat) {
+      return response.badRequest({ error: 'outputFormat is required' })
+    }
+
+    const fileName  = `${cuid()}.${videoFile.extname}`
+    const uploadDir = app.makePath('storage/videos/uploads')
+    const rawPath   = path.join(uploadDir, fileName)
+
+    await videoFile.move(uploadDir, { name: fileName })
+
+    const service = new VideoService()
+    await service.compressFile(rawPath)
+
+    const result = await service.convertVideo({
+      fileName,
+      outputFormat: outputFormat.toLowerCase(),
+      quality,
+      resolution,
+      filters: filters as AdvancedFilters | undefined,
+    })
+
+    return response.ok({
+      message: 'Video uploaded, converted, and stored compressed',
+      data: result,
+    })
   }
 
   async download({ params, request, response, i18n }: HttpContext) {
@@ -395,10 +479,9 @@ export default class VideosController {
 
     const source = (request.qs().source || 'converted') as 'uploads' | 'converted'
 
-    const storageDir =
-      source === 'uploads'
-        ? app.makePath('storage/videos/uploads')
-        : app.makePath('storage/videos/converted')
+    const storageDir = source === 'uploads'
+      ? app.makePath('storage/videos/uploads')
+      : app.makePath('storage/videos/converted')
 
     const expectedGzPath = path.join(storageDir, `${fileName}.gz`)
 
