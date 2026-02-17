@@ -21,7 +21,7 @@ const SUPPORTED_RESOLUTIONS: VideoResolution[] = ['360p', '480p', '720p', '1080p
 const SUPPORTED_ENHANCES: EnhanceType[]   = ['denoise', 'sharpen', 'stabilize', 'hdr', 'none']
 
 export default class VideosController {
-x
+
   async index({ auth, response }: HttpContext) {
     // const user = await auth.authenticate()
     const videos = await Video.query()
