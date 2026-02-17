@@ -1,8 +1,15 @@
+import { readFileSync } from 'node:fs'
+import { createServer } from 'node:https'
 import { Server } from 'socket.io'
 import app from '@adonisjs/core/services/app'
-import server from '@adonisjs/core/services/server'
 
 let io: Server
+
+// Create HTTPS server with mkcert certs
+const httpsServer = createServer({
+  key: readFileSync(new URL('../192.168.0.186+2-key.pem', import.meta.url)),
+  cert: readFileSync(new URL('../192.168.0.186+2.pem', import.meta.url)),
+})
 
 let isLive = false
 let broadcasterId: string | null = null
@@ -19,9 +26,18 @@ interface BroadcasterInfo {
 let broadcasterInfo: BroadcasterInfo | null = null
 
 app.ready(() => {
-  io = new Server(server.getNodeServer(), {
-    cors: { origin: '*' },
+  // ✅ Attach Socket.io to HTTPS server (not AdonisJS internal server)
+  io = new Server(httpsServer, {
+    cors: {
+      origin: 'https://192.168.0.186:5173',  // ✅ exact frontend URL
+      methods: ['GET', 'POST'],
+    },
     maxHttpBufferSize: 5e7,
+  })
+
+  // ✅ Start HTTPS server on separate port for Socket.io
+  httpsServer.listen(3334, '0.0.0.0', () => {
+    console.log('🔒 Socket.io running on wss://192.168.0.186:3334')
   })
 
   io.on('connection', (socket) => {
@@ -60,7 +76,6 @@ app.ready(() => {
 
         console.log(`Viewer joined! Total viewers: ${viewers.size}`)
 
-        // FIX: Only send the number (what frontend expects)
         io.emit('viewer-count', viewers.size)
 
         if (broadcasterId) {
@@ -169,7 +184,7 @@ app.ready(() => {
             title: broadcasterInfo.title,
             startTime: broadcasterInfo.startTime,
             viewersCount: viewers.size,
-          }
+          },
         ])
       } else {
         callback([])

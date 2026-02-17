@@ -1,0 +1,11 @@
+1
+00:00:00,000 --> 00:00:05,000
+[Auto-generated caption placeholder - segment 1]
+
+2
+00:00:05,000 --> 00:00:10,000
+[Auto-generated caption placeholder - segment 2]
+
+3
+00:00:10,000 --> 00:00:15,000
+[Auto-generated caption placeholder - segment 3]
