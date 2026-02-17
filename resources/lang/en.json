@@ -65,7 +65,20 @@
     "download_failed": "Download preparation failed.",
 
     "unauthorized_access": "You are not authorized to access this video.",
-    "video_not_found": "Video not found."
+    "video_not_found": "Video not found.",
+    "filters": {
+      "brightness": "Brightness must be between -1.0 and 1.0",
+      "contrast": "Contrast must be between 0.0 and 3.0",
+      "saturation": "Saturation must be between 0.0 and 3.0",
+      "gamma": "Gamma must be between 0.1 and 3.0",
+      "sharpen": "Sharpen must be between 0 and 10",
+      "denoise": "Denoise must be between 0 and 10",
+      "blur": "Blur must be between 0 and 10",
+      "vignette": "Vignette must be between 0.0 and 1.0",
+      "rotate": "Rotate must be 0, 90, 180, or 270",
+      "colorTemp": "Color temperature must be between -100 and 100",
+      "vibrance": "Vibrance must be between 0.0 and 2.0"
+    }
   },
   "thumbnail": {
     "no_video_provided": "No video file provided.",
