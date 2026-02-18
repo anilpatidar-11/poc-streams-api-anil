@@ -7,9 +7,13 @@ import { v4 as uuid } from 'uuid'
 import app from '@adonisjs/core/services/app'
 import cloudinary from './cloudinary_service.js'
 
+// if (ffmpegStatic) {
+//     // ffmpeg.setFfmpegPath(ffmpegStatic)
+//     ffmpeg.setFfmpegPath(ffmpegStatic as string)
+// }
+
 if (ffmpegStatic) {
-    // ffmpeg.setFfmpegPath(ffmpegStatic)
-    ffmpeg.setFfmpegPath(ffmpegStatic as string)
+  ffmpeg.setFfmpegPath(ffmpegStatic as unknown as string)
 }
 
 // ── Interfaces ────────────────────────────────────────────────
