@@ -5,6 +5,7 @@ const AuthController = () => import('#controllers/auth_controller')
 const VideosController = () => import('#controllers/videos_controller')
 const AudioController = () => import('#controllers/audio_controller')
 const VideoThumbnailController = () => import('#controllers/video_thumbnail_controller')
+const LiveStreamsController = () => import('#controllers/live_streams_controller')
 
 // ══════════════════════════════════════════════════════════════
 // PUBLIC ROUTES
@@ -67,7 +68,7 @@ router
   .prefix('/api/v1')
 
 // routes/live_streams.ts
-const LiveStreamsController = () => import('#controllers/live_streams_controller')
+// const LiveStreamsController = () => import('#controllers/live_streams_controller')
 router
   .group(() => {
     // Start a new live stream
@@ -82,13 +83,13 @@ router
     // Cancel live stream
     router.post('/:sessionId/cancel', [LiveStreamsController, 'cancel'])
 
-    // Get user's videos
-    router.get('/my-videos', [LiveStreamsController, 'getMyVideos'])
+    // // Get user's videos
+    // router.get('/my-videos', [LiveStreamsController, 'getMyVideos'])
 
-    // Get single video
-    router.get('/videos/:videoId', [LiveStreamsController, 'getVideo'])
+    // // Get single video
+    // router.get('/videos/:videoId', [LiveStreamsController, 'getVideo'])
 
-    // Delete video
-    router.delete('/videos/:videoId', [LiveStreamsController, 'deleteVideo'])
+    // // Delete video
+    // router.delete('/videos/:videoId', [LiveStreamsController, 'deleteVideo'])
   })
   .prefix('/api/live-streams')
