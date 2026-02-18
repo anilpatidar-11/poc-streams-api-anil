@@ -3,7 +3,6 @@ import User from '#models/user'
 import { loginValidator, registerValidator } from '#validators/auth_validator'
 
 export default class AuthController {
-
   async register({ request, response }: HttpContext) {
     const data = await request.validateUsing(registerValidator)
 
@@ -15,7 +14,7 @@ export default class AuthController {
     const user = await User.create({
       fullName: data.full_name,
       email: data.email,
-      password: data.password,  
+      password: data.password,
     })
 
     return response.created({
@@ -40,7 +39,7 @@ export default class AuthController {
 
     return response.ok({
       message: 'Login successful',
-      token: token.value!.release(), 
+      token: token.value!.release(),
       user: {
         id: user.id,
         fullName: user.fullName,
@@ -51,8 +50,8 @@ export default class AuthController {
 
   async logout({ auth, response }: HttpContext) {
     const user = await auth.authenticate()
-    await User.accessTokens.delete(user, user.currentAccessToken.identifier)
-
+    //await User.accessTokens.delete(user, user.currentAccessToken.identifier)
+    await User.accessTokens.delete(user, (user as any).currentAccessToken.identifier)
     return response.ok({ message: 'Logged out successfully' })
   }
 

@@ -8,7 +8,8 @@ import app from '@adonisjs/core/services/app'
 import cloudinary from './cloudinary_service.js'
 
 if (ffmpegStatic) {
-    ffmpeg.setFfmpegPath(ffmpegStatic)
+    // ffmpeg.setFfmpegPath(ffmpegStatic)
+    ffmpeg.setFfmpegPath(ffmpegStatic as string)
 }
 
 // ── Interfaces ────────────────────────────────────────────────
