@@ -3,10 +3,10 @@
   "compilerOptions": {
     "rootDir": "./",
     "outDir": "./build",
-     "noUnusedLocals": false,
-     "noUnusedParameters": false,
-     "strictNullChecks": false
+
+    "strict": false,
+    "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   }
 }
-
-
