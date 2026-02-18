@@ -87,6 +87,7 @@
     "processing_failed": "Video processing failed.",
     "thumbnails_not_found": "No thumbnails found for this video.",
     "video_folder_not_found": "Video folder not found.",
+    "thumbnails_fetched": "Thumbnails fetched successfully.",
     "videos_fetched": "Processed videos fetched successfully.",
     "no_videos_yet": "No videos processed yet.",
     "internal_error": "Something went wrong while processing the video."
